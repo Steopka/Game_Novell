@@ -1,31 +1,39 @@
 ﻿using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
-using TMPro; // Используйте для TextMeshPro
-
-public class DialogueSystem : MonoBehaviour // Более понятное имя класса
+using UnityEngine.Events; // Добавлено для событий
+using TMPro;
+public class DialogueSystem : MonoBehaviour
 {
     [Header("Dialogue Settings")]
-    public string[] lines;                  // Массив реплик
-    public float textSpeed = 0.05f;         // Скорость появления текста
-    public TMP_Text dialogueText;               // Для стандартного UI Text
-                                            // public TMP_Text dialogueText;        // Раскомментировать для TextMeshPro
+    public string[] lines;
+    public float textSpeed = 0.05f;
+    public TMP_Text dialogueText;
 
     [Header("Configuration")]
-    public bool startOnAwake = true;        // Запускать диалог автоматически
+    public bool startOnAwake = true;
+    public UnityEvent onDialogueStart;
+    public UnityEvent onDialogueEnd;
 
-    private int index;                      // Текущая позиция в диалоге
-    private Coroutine typingCoroutine;      // Ссылка на корутину
-    private bool isTyping = false;          // Флаг процесса печати
+    private int index;
+    private Coroutine typingCoroutine;
+    private bool isTyping = false;
+    private bool dialogueActive = false;
 
     void Start()
     {
+        // Проверка компонента Text
         if (dialogueText == null)
         {
-            Debug.LogError("Dialogue Text component not assigned!");
-            enabled = false;
-            return;
+            // Попытка автоматического поиска
+            dialogueText = GetComponentInChildren<TMP_Text>();
+
+            if (dialogueText == null)
+            {
+                Debug.LogError("Dialogue Text component not found! Please assign a Text component.", this);
+                enabled = false;
+                return;
+            }
         }
 
         dialogueText.text = string.Empty;
@@ -40,13 +48,15 @@ public class DialogueSystem : MonoBehaviour // Более понятное им�
     {
         if (lines.Length == 0)
         {
-            Debug.LogWarning("No dialogue lines available!");
+            Debug.LogWarning("No dialogue lines available!", this);
             return;
         }
 
+        dialogueActive = true;
         index = 0;
         dialogueText.text = string.Empty;
         gameObject.SetActive(true);
+        onDialogueStart?.Invoke();
         StartTypingLine();
     }
 
@@ -63,7 +73,7 @@ public class DialogueSystem : MonoBehaviour // Более понятное им�
     IEnumerator TypeLine()
     {
         isTyping = true;
-        dialogueText.text = ""; // Очищаем предыдущий текст
+        dialogueText.text = "";
 
         foreach (char c in lines[index].ToCharArray())
         {
@@ -77,6 +87,8 @@ public class DialogueSystem : MonoBehaviour // Более понятное им�
 
     public void SkipOrContinue()
     {
+        if (!dialogueActive) return;
+
         if (isTyping)
         {
             // Пропустить анимацию печати
@@ -92,7 +104,7 @@ public class DialogueSystem : MonoBehaviour // Более понятное им�
         }
     }
 
-    public void NextLine()
+    private void NextLine()
     {
         if (index < lines.Length - 1)
         {
@@ -112,8 +124,18 @@ public class DialogueSystem : MonoBehaviour // Более понятное им�
             StopCoroutine(typingCoroutine);
         }
 
+        dialogueActive = false;
+        dialogueText.text = string.Empty;
         gameObject.SetActive(false);
-        // Здесь можно добавить вызов события окончания диалога
-        // OnDialogueEnd?.Invoke();
+        onDialogueEnd?.Invoke();
+    }
+
+    // Для отладки в редакторе
+    void OnValidate()
+    {
+        if (dialogueText == null)
+        {
+            dialogueText = GetComponentInChildren<TMP_Text>();
+        }
     }
 }
